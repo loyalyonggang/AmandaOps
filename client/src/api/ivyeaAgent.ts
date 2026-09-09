@@ -1725,6 +1725,52 @@ export async function consoleSessionApprovals(sessionId: string) {
   return data.approvals || [];
 }
 
+// ── 任务台产物文件 ──────────────────────────────────────────────────────────
+//
+// 「跑完了，把东西拿走」是任务的最后一步。列表落在服务端，所以**刷新、隔天回来
+// 都还在** —— file_change 事件只活在跑那一轮的标签页内存里，靠它撑不起下载。
+
+export type ConsoleFile = {
+  /** 下载 / 预览的唯一寻址方式。服务端按它查路径，路径永不来自前端。 */
+  id: string;
+  name: string;
+  path: string;
+  action: string;
+  changes: number;
+  last_seen: number;
+  /** 渲染器选择：markdown | csv | text | html | image | pdf | binary。服务端判定。 */
+  kind: string;
+  /** 现场 stat 的结果 —— 文件后来被删了这里就是 false。 */
+  exists: boolean;
+  size: number;
+  mtime: number;
+  previewable: boolean;
+};
+
+export async function consoleSessionFiles(sessionId: string) {
+  const { data } = await api.get<{ ok: boolean; files: ConsoleFile[] }>(
+    `/ivyea-agent/console/sessions/${encodeURIComponent(sessionId)}/files`);
+  return data.files || [];
+}
+
+export async function consoleFileText(fileId: string) {
+  const { data } = await api.get<{
+    ok: boolean; name: string; path: string; kind: string;
+    text: string; truncated: boolean; size: number;
+  }>(`/ivyea-agent/console/files/${encodeURIComponent(fileId)}/text`);
+  return data;
+}
+
+/**
+ * 文件本体的地址。
+ *
+ * 直接给 `<a href>` / `<img src>` 用 —— 鉴权是 cookie，同源请求自动带上，
+ * 不需要前端先取 blob 再造 objectURL（那样大文件会整个进内存）。
+ */
+export function consoleFileRawUrl(fileId: string, download = true) {
+  return `/api/ivyea-agent/console/files/${encodeURIComponent(fileId)}/raw?download=${download ? 1 : 0}`;
+}
+
 // ── 记忆管理 ────────────────────────────────────────────────────────────────
 //
 // 记忆里装的是"我是谁、我定过什么规矩、agent 从我身上推断出了什么"。

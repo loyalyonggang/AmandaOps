@@ -16,10 +16,11 @@
 """
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import time
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Iterator
 
 from app.core.config import settings
@@ -87,6 +88,20 @@ _BASELINE_SCHEMA = (
         PRIMARY KEY (name, principal)
     );
     """,
+    """
+    CREATE TABLE IF NOT EXISTS console_files (
+        id         TEXT PRIMARY KEY NOT NULL,
+        session_id TEXT NOT NULL DEFAULT '',
+        principal  TEXT NOT NULL DEFAULT '',
+        path       TEXT NOT NULL DEFAULT '',
+        name       TEXT NOT NULL DEFAULT '',
+        action     TEXT NOT NULL DEFAULT '',
+        changes    INTEGER NOT NULL DEFAULT 1,
+        first_seen REAL NOT NULL DEFAULT 0,
+        last_seen  REAL NOT NULL DEFAULT 0
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_console_files_session ON console_files(session_id, last_seen DESC);",
     """
     CREATE TABLE IF NOT EXISTS console_approvals (
         request_id   TEXT PRIMARY KEY NOT NULL,
@@ -273,6 +288,8 @@ def update_session(session_id: str, *, title: str | None = None,
 def forget_session(session_id: str) -> None:
     with _conn() as conn:
         conn.execute("DELETE FROM console_sessions WHERE session_id = ?", (session_id,))
+        # 产物索引跟着走：会话没了还留着文件行，就是查不到主人的孤儿数据
+        conn.execute("DELETE FROM console_files WHERE session_id = ?", (session_id,))
 
 
 # ── 工作区 ──────────────────────────────────────────────────────────────────
@@ -370,6 +387,80 @@ def workspace_path(name: str, principal: str) -> str:
 #
 # 按 principal 隔离：预设里带着工作区（可能绑到某个目录），共享等于把别人的
 # 目录选项摆进你的下拉框。要共享另说，先别把口子开在这。
+
+# ── 产物文件 ────────────────────────────────────────────────────────────────
+#
+# Agent 在一轮里写出来的文件，界面上原本只看得见文件名和 diff：点不动、下不了。
+# 而"把跑出来的东西拿走"恰恰是任务的最后一步。
+#
+# **为什么要落库**：`file_change` 事件此前只活在发起那一轮的那个标签页的内存里
+# （Console 恢复历史会话时会把它清空）。刷新一次、或者第二天回来想把报表下下来，
+# 列表就是空的 —— 那等于这个功能只在跑完那一屏存在。
+#
+# **只记索引，不复制文件**：产物可能是几十 MB 的表格或图片，再存一份既费盘也会
+# 立刻和真实文件不同步。所以库里只有路径；大小 / 修改时间 / 还在不在都是**取用时
+# 现场 stat**，文件被删了就如实说"已不在"，不拿旧值骗人。
+
+
+def _file_id(session_id: str, path: str) -> str:
+    """同一会话同一路径永远是同一个 id —— 重跑不会攒出重复行。
+
+    id 是下载 / 预览端点**唯一**的寻址方式：用户输入永远不进文件系统，
+    所以路径穿越这类问题从根上不存在（见路由层注释）。
+    """
+    raw = f"{session_id}\x00{path}".encode("utf-8", "replace")
+    return hashlib.sha1(raw).hexdigest()[:16]
+
+
+def record_file(session_id: str, principal: str, path: str, action: str = "") -> None:
+    """记一次产物写入。同路径重复写只累加次数，不新增行。"""
+    session_id = (session_id or "").strip()
+    path = (path or "").strip()
+    if not session_id or not path:
+        return
+    now = time.time()
+    fid = _file_id(session_id, path)
+    name = PurePath(path).name or path
+    with _conn() as conn:
+        row = conn.execute("SELECT changes FROM console_files WHERE id = ?", (fid,)).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE console_files SET changes = ?, last_seen = ?, action = ? WHERE id = ?",
+                (int(row["changes"] or 0) + 1, now, (action or "")[:20], fid),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO console_files (id, session_id, principal, path, name, action,"
+                " changes, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+                (fid, session_id, principal or "", path[:1000], name[:200],
+                 (action or "")[:20], now, now),
+            )
+
+
+def session_files(session_id: str) -> list[dict[str, Any]]:
+    """一条会话产出过的文件（新到旧）。是否还在盘上由调用方现场判。"""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM console_files WHERE session_id = ? ORDER BY last_seen DESC",
+            (session_id or "",),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def file_row(file_id: str) -> dict[str, Any] | None:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM console_files WHERE id = ?", ((file_id or "").strip(),)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def forget_session_files(session_id: str) -> int:
+    """删会话时连产物索引一起删 —— 留着就是一堆指向不存在会话的孤儿行。"""
+    with _conn() as conn:
+        cur = conn.execute("DELETE FROM console_files WHERE session_id = ?", (session_id or "",))
+        return int(cur.rowcount or 0)
+
 
 def list_presets(principal: str) -> list[dict[str, Any]]:
     with _conn() as conn:

@@ -8,11 +8,12 @@ import re
 import asyncio
 import threading as _threading
 import time as _time
+from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.core.security import require_user, require_user_info, require_admin
@@ -550,12 +551,22 @@ def _tee_session_events(chunks: Any, principal: str, workspace: str = "",
                     is_start = b"event: start" in frame
                     is_req = b"permission_request" in frame
                     is_timeout = b"permission_timeout" in frame
-                    if not (is_start or is_req or is_timeout):
+                    is_file = b"file_change" in frame
+                    if not (is_start or is_req or is_timeout or is_file):
                         continue
                     for line in frame.split(b"\n"):
                         if not line.startswith(b"data:"):
                             continue
                         data = _json.loads(line[5:].strip().decode("utf-8", "replace"))
+                        if is_file:
+                            # 产物索引。**只在这儿记**，因为路径只有事件里有；
+                            # session_id 事件自带，但取不到时退回本轮的 live_sid ——
+                            # 少记一条的后果是"跑出来的文件在列表里找不到"。
+                            console_sessions.record_file(
+                                str(data.get("session_id") or "") or live_sid,
+                                principal, str(data.get("path") or ""),
+                                str(data.get("action") or ""))
+                            continue
                         if is_start:
                             sid = str(data.get("session_id") or "")
                             # persist=False 的轮次 agent 不落盘（跟进建议、各处的一次性
@@ -594,6 +605,38 @@ def _tee_session_events(chunks: Any, principal: str, workspace: str = "",
         if live_sid:
             _threading.Thread(target=_auto_title_session, args=(live_sid,),
                               name="console-auto-title", daemon=True).start()
+
+
+def _tee_files_only(chunks: Any, principal: str) -> Any:
+    """接流时也把产物记下来。
+
+    为什么单独来一个：发起那一轮的标签页一旦关掉，`_tee_session_events` 的生成器就
+    被关了，之后 agent 再写的文件**一条都记不上** —— 而"关了页面回头来拿文件"正是
+    这个功能最常见的用法。这里只做记账，不登记会话、不推审批、不起名，
+    那些是发起方那条流的责任，重复做会推两遍通知、起两次名。
+
+    落库是幂等的（同会话同路径同一个 id），所以和发起方那条流并行记也不会重复。
+    """
+    buf = b""
+    for chunk in chunks:
+        yield chunk
+        try:
+            buf += chunk
+            while b"\n\n" in buf:
+                frame, buf = buf.split(b"\n\n", 1)
+                if b"file_change" not in frame:
+                    continue
+                for line in frame.split(b"\n"):
+                    if not line.startswith(b"data:"):
+                        continue
+                    data = _json.loads(line[5:].strip().decode("utf-8", "replace"))
+                    console_sessions.record_file(
+                        str(data.get("session_id") or ""), principal,
+                        str(data.get("path") or ""), str(data.get("action") or ""))
+            if len(buf) > 2_000_000:
+                buf = buf[-4096:]
+        except Exception:  # noqa: BLE001 — 记账失败绝不能影响转发
+            buf = b""
 
 
 def _resolve_workspace(body: ChatBody, user: str) -> tuple[dict[str, Any], str]:
@@ -810,7 +853,8 @@ def chat_session_live(session_id: str,
     if not console_sessions.can_access(session_id, principal, is_admin):
         raise HTTPException(status_code=403, detail="这条会话不属于你")
     return StreamingResponse(
-        svc.chat_session_live(session_id, from_seq),
+        # 记产物：发起那一轮的标签页可能早关了，那条 tee 已经停了（见 _tee_files_only）
+        _tee_files_only(svc.chat_session_live(session_id, from_seq), principal),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -1104,6 +1148,175 @@ def console_session_approvals(session_id: str,
     if not console_sessions.can_access(session_id, principal, is_admin):
         raise HTTPException(status_code=403, detail="这条会话不属于你")
     return {"ok": True, "approvals": console_sessions.session_approvals(session_id)}
+
+
+# ── 任务台产物：下载 / 预览 ──────────────────────────────────────────────────
+#
+# 「跑完了，把东西拿走」是任务的最后一步。此前产物栏只画得出文件名和 diff，
+# 点不动也下不了 —— 用户得自己 ssh 上去 scp。
+#
+# ## 授权模型：按 id 寻址，路径永不来自用户
+#
+# 端点**只接受一个 id**，路径从库里查。用户输入永远不进文件系统，
+# 所以 `../../etc/passwd` 这类穿越从根上不存在 —— 不是靠过滤挡住的。
+#
+# 那"能不能下载别人的文件"？id 对应的会话必须属于你（admin 除外）。
+# 至于"这个用户能不能拿到这个文件"：文件正是 agent **按他自己的指令**写出来的，
+# 他本来就能让 agent `read_file` 把内容打印出来。这个端点不扩大信任边界，
+# 只是省掉一次往返。
+#
+# ## 预览为什么不能直接 inline
+#
+# 产物里可能有 .html / .svg —— 在自己的域上 inline 渲染它，等于执行别人生成的脚本。
+# 所以 inline 只放行图片 / PDF / 纯文本，**text/html 一律不 inline**；
+# HTML 预览走前端的沙箱 iframe（见 client 的 FilePreview）。
+# inline 响应统一带 `Content-Security-Policy: sandbox` 与 `nosniff` 兜底。
+
+# 预览能读多少字。超了截断并标记 —— 一个 40MB 的 csv 不该把浏览器卡死。
+_PREVIEW_MAX_BYTES = 512 * 1024
+
+# 扩展名 → 前端用哪个渲染器。**判定只写在服务端这一份**，
+# 前端只按 kind 分发；两边各写一张表迟早会长歪。
+_KIND_BY_EXT: dict[str, str] = {
+    "md": "markdown", "markdown": "markdown",
+    "csv": "csv", "tsv": "csv",
+    "json": "text", "yaml": "text", "yml": "text", "toml": "text", "ini": "text",
+    "txt": "text", "log": "text", "text": "text",
+    "py": "text", "js": "text", "ts": "text", "tsx": "text", "jsx": "text",
+    "sh": "text", "sql": "text", "css": "text", "xml": "text", "conf": "text",
+    "html": "html", "htm": "html",
+    "png": "image", "jpg": "image", "jpeg": "image", "gif": "image",
+    "webp": "image", "bmp": "image", "svg": "image",
+    "pdf": "pdf",
+}
+
+# inline 放行的类型。**没有 text/html** —— 见上面那段。
+#
+# svg 在这里面，理由值得写清楚：svg 能带 <script>，但**它只在被当作文档加载时才跑**
+# （直接输入网址、<object>/<embed>）；`<img src>` 里的 svg 按规范一律不执行脚本，
+# 而预览器用的就是 <img>。再叠一层 `CSP: sandbox`（不给 allow-scripts），
+# 连"有人把 raw 地址粘到地址栏"那条路也堵上了。
+_INLINE_MIME: dict[str, str] = {
+    "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif",
+    "webp": "image/webp", "bmp": "image/bmp", "svg": "image/svg+xml",
+    "pdf": "application/pdf",
+}
+
+
+def _file_kind(name: str) -> str:
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    return _KIND_BY_EXT.get(ext, "binary")
+
+
+def _file_view(row: dict[str, Any]) -> dict[str, Any]:
+    """一条产物记录 + **现场 stat**。
+
+    大小 / 修改时间 / 还在不在都当场量：库里存的是索引，不是快照。
+    文件被删了就如实说"已不在" —— 拿旧值画一个点不开的下载按钮更糟。
+    """
+    path = str(row.get("path") or "")
+    kind = _file_kind(str(row.get("name") or path))
+    out = {
+        "id": row.get("id"), "name": row.get("name"), "path": path,
+        "action": row.get("action") or "", "changes": int(row.get("changes") or 1),
+        "last_seen": row.get("last_seen") or 0, "kind": kind,
+        "exists": False, "size": 0, "mtime": 0.0,
+    }
+    try:
+        p = Path(path)
+        if p.is_file():
+            st = p.stat()
+            out.update(exists=True, size=int(st.st_size), mtime=float(st.st_mtime))
+    except OSError:
+        pass
+    # 二进制没有预览器，但下载照给：不能因为看不了就连拿都拿不走
+    out["previewable"] = out["exists"] and kind != "binary"
+    return out
+
+
+def _owned_file(file_id: str, info: dict[str, Any]) -> dict[str, Any]:
+    """按 id 取一条产物，并确认它属于你。查不到和不属于你都返回 404。
+
+    **故意不区分这两种情况**：区分了就等于告诉外面"这个 id 存在，只是不归你"，
+    那是一个可以拿来枚举别人会话的信号。
+    """
+    principal, is_admin = _principal_info(info)
+    row = console_sessions.file_row(file_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    if not console_sessions.can_access(str(row.get("session_id") or ""), principal, is_admin):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return row
+
+
+@router.get("/console/sessions/{session_id}/files")
+def console_session_files(session_id: str,
+                          info: dict[str, Any] = Depends(require_user_info)) -> dict[str, Any]:
+    """这条会话产出过的文件。刷新、隔天回来都还在 —— 索引落在服务端。"""
+    principal, is_admin = _principal_info(info)
+    if not console_sessions.can_access(session_id, principal, is_admin):
+        raise HTTPException(status_code=403, detail="这条会话不属于你")
+    rows = console_sessions.session_files(session_id)
+    return {"ok": True, "files": [_file_view(r) for r in rows]}
+
+
+@router.get("/console/files/{file_id}/text")
+def console_file_text(file_id: str,
+                      info: dict[str, Any] = Depends(require_user_info)) -> dict[str, Any]:
+    """预览用的文本。**不做任何渲染**，只把字节按 utf-8 解出来交给前端。
+
+    HTML 也走这条路（而不是 inline 一个 text/html 响应）：前端拿到的是字符串，
+    塞进 sandbox iframe 的 srcdoc 里渲染，脚本一行都跑不了。
+    """
+    row = _owned_file(file_id, info)
+    path = Path(str(row.get("path") or ""))
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件已不在磁盘上")
+    try:
+        raw = path.open("rb").read(_PREVIEW_MAX_BYTES + 1)
+    except OSError as exc:
+        raise HTTPException(status_code=404, detail=f"读不到这个文件：{exc}") from exc
+    truncated = len(raw) > _PREVIEW_MAX_BYTES
+    text = raw[:_PREVIEW_MAX_BYTES].decode("utf-8", "replace")
+    return {"ok": True, "name": row.get("name"), "path": str(path),
+            "kind": _file_kind(str(row.get("name") or path.name)),
+            "text": text, "truncated": truncated, "size": path.stat().st_size}
+
+
+@router.get("/console/files/{file_id}/raw")
+def console_file_raw(file_id: str, download: int = Query(1),
+                     info: dict[str, Any] = Depends(require_user_info)) -> FileResponse:
+    """把文件本体给出去。
+
+    `download=1`（默认）→ `octet-stream + attachment`，浏览器只会存盘。
+    `download=0` → 只对图片 / PDF inline，其余一律退回强制下载：
+    **不在自己的域上打开来路不明的内容**（和 assistant 的 session-file 同一条规矩）。
+    """
+    row = _owned_file(file_id, info)
+    path = Path(str(row.get("path") or ""))
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件已不在磁盘上")
+    name = str(row.get("name") or path.name)
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    inline_mime = _INLINE_MIME.get(ext) if not download else None
+    if inline_mime:
+        return FileResponse(
+            path, media_type=inline_mime,
+            headers={
+                # 沙箱化：即便哪天误放行了一个能执行的类型，它也跑不了脚本、
+                # 拿不到我们的同源身份。nosniff 挡住"按内容猜类型"那条老路。
+                # sandbox 不带 allow-scripts = 就算被人直接粘到地址栏当文档打开，
+                # 里面的脚本也一行都跑不了，而且拿不到我们的同源身份。
+                # style-src 留着 unsafe-inline：svg/pdf 直开时样式还得在，
+                # 挡脚本靠的是 sandbox，不是把样式一起砍掉。
+                "Content-Security-Policy":
+                    "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
+                "X-Content-Type-Options": "nosniff",
+                "Content-Disposition": f"inline; filename*=UTF-8''{quote(name)}",
+            },
+        )
+    return FileResponse(path, media_type="application/octet-stream",
+                        filename=Path(name).name[:200] or path.name)
 
 
 @router.get("/console/presets")

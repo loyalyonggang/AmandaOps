@@ -13,7 +13,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Icon from "../Icon";
 import { MarkdownReport } from "../../lib/reportFormat";
-import type { IvyeaFileChange } from "../../api/ivyeaAgent";
+import FilePreview, { fmtSize, fmtTime } from "./FilePreview";
+import { consoleFileRawUrl, type ConsoleFile, type IvyeaFileChange } from "../../api/ivyeaAgent";
 
 export type RailTodo = { content?: string; status?: string; [k: string]: any };
 export type RailApproval = { title: string; decision: string; at: number };
@@ -68,6 +69,7 @@ export default function ArtifactRail({
   answers,
   todos,
   fileChanges = [],
+  files: serverFiles = [],
   approvals,
   sessionId,
   model,
@@ -77,8 +79,13 @@ export default function ArtifactRail({
   /** 本会话里 Agent 给出的正文，按先后顺序。 */
   answers: string[];
   todos: RailTodo[];
-  /** Agent 本会话改过的文件（含 diff）。 */
+  /** Agent 本会话改过的文件（含 diff）。实时事件，页面一刷新就没了。 */
   fileChanges?: IvyeaFileChange[];
+  /**
+   * 服务端记下的产物索引（含大小 / 修改时间 / 还在不在）。
+   * 它是"刷新之后还找得到"的那一半 —— 实时事件只在跑那一轮的标签页里有。
+   */
+  files?: ConsoleFile[];
   approvals: RailApproval[];
   sessionId: string;
   model?: string;
@@ -87,6 +94,7 @@ export default function ArtifactRail({
 }) {
   const [open, setOpen] = useState<TabKey | null>(null);
   const [copied, setCopied] = useState(false);
+  const [preview, setPreview] = useState<ConsoleFile | null>(null);
 
   // 本会话的正文拼成一份报告：多轮之间用分隔线断开，便于整段带走。
   const report = useMemo(
@@ -94,16 +102,29 @@ export default function ArtifactRail({
     [answers],
   );
 
-  // 「文件」按路径去重（同一个文件改三次算一个文件）；「改动」数的是改动次数。
+  /*
+   * 「文件」按路径去重（同一个文件改三次算一个文件）；「改动」数的是改动次数。
+   *
+   * 两个数据源要**并起来**，缺一不可：
+   * - 实时的 `file_change`：这一轮刚写的，服务端可能还没落库；
+   * - 服务端索引 `serverFiles`：历史会话、刷新之后**唯一**还在的那份，
+   *   而且只有它带得出大小 / 修改时间 / 文件还在不在，以及下载要用的 id。
+   * 只用前者，刷新就空；只用后者，刚写完那一下要等一次请求才出现。
+   */
   const files = useMemo(() => {
-    const by = new Map<string, IvyeaFileChange[]>();
+    const by = new Map<string, { path: string; list: IvyeaFileChange[]; meta?: ConsoleFile }>();
     for (const c of fileChanges) {
-      const list = by.get(c.path) || [];
-      list.push(c);
-      by.set(c.path, list);
+      const cur = by.get(c.path) || { path: c.path, list: [] };
+      cur.list.push(c);
+      by.set(c.path, cur);
     }
-    return [...by.entries()].map(([path, list]) => ({ path, list }));
-  }, [fileChanges]);
+    for (const f of serverFiles) {
+      const cur = by.get(f.path) || { path: f.path, list: [] };
+      cur.meta = f;
+      by.set(f.path, cur);
+    }
+    return [...by.values()].sort((a, b) => (b.meta?.last_seen || 0) - (a.meta?.last_seen || 0));
+  }, [fileChanges, serverFiles]);
 
   const counts: Record<TabKey, number> = {
     report: answers.filter((a) => a.trim()).length,
@@ -198,20 +219,76 @@ export default function ArtifactRail({
 
           {open === "file" && (
             files.length === 0
-              ? <Empty>这一会话 Agent 还没有改动过文件。写入或编辑之后，动过的文件会列在这里。</Empty>
+              ? <Empty>这一会话 Agent 还没有写出文件。写入或编辑之后，文件会列在这里，可以直接预览或下载。</Empty>
               : (
                 <ul className="cr-files">
                   {files.map((f) => {
-                    const name = f.path.split(/[\\/]/).pop() || f.path;
+                    const name = f.meta?.name || f.path.split(/[\\/]/).pop() || f.path;
                     const last = f.list[f.list.length - 1];
+                    const action = last?.action || f.meta?.action || "";
+                    const times = Math.max(f.list.length, f.meta?.changes || 0);
+                    const meta = f.meta;
+                    // 没有 meta = 服务端索引还没同步过来（刚写完的那一瞬）。
+                    // 这时按钮先禁用并说明，比画一个点了报错的按钮好。
+                    const gone = !!meta && !meta.exists;
                     return (
                       <li key={f.path} title={f.path}>
-                        <span className={"cr-file-act act-" + last.action}>
-                          {ACTION_LABEL[last.action] || last.action}
+                        <span className={"cr-file-act act-" + action}>
+                          {ACTION_LABEL[action] || action || "写入"}
                         </span>
-                        <span className="cr-file-name">{name}</span>
-                        {f.list.length > 1 && <em>改 {f.list.length} 次</em>}
-                        <span className="cr-file-path">{f.path}</span>
+                        <span className="cr-file-name">
+                          {/* 名字自己截断，右边那几个小标签**不参与挤压** ——
+                              一个长文件名不该把"已不在""改 3 次"顶出可视区，
+                              那几个字恰恰是决定"还点不点得动"的信息 */}
+                          <b className="cr-file-label">{name}</b>
+                          {/* 这一行只留"会改变你要不要点它"的标签。
+                              大小和时间挪到下面那行 —— 实测它们会把文件名挤成
+                              「广…」「草…」，而名字恰恰是扫读时唯一要看的东西。 */}
+                          {times > 1 && <em>改 {times} 次</em>}
+                          {gone && <em className="cr-file-gone">已不在</em>}
+                        </span>
+                        <span className="cr-file-acts">
+                          <button
+                            type="button"
+                            className="cr-file-btn"
+                            disabled={!meta?.previewable}
+                            title={
+                              !meta ? "刚写完，稍等一下再试"
+                                : gone ? "文件已不在磁盘上"
+                                : meta.previewable ? "预览" : "这个类型没法在网页里看，下载吧"
+                            }
+                            onClick={() => meta && setPreview(meta)}
+                          >
+                            <Icon name="preview" size={13} />
+                          </button>
+                          <a
+                            className={"cr-file-btn" + (meta?.exists ? "" : " disabled")}
+                            href={meta?.exists ? consoleFileRawUrl(meta.id, true) : undefined}
+                            download={meta?.name}
+                            title={
+                              !meta ? "刚写完，稍等一下再试"
+                                : gone ? "文件已不在磁盘上" : "下载"
+                            }
+                            onClick={(e) => { if (!meta?.exists) e.preventDefault(); }}
+                          >
+                            <Icon name="download" size={13} />
+                          </a>
+                        </span>
+                        {/* 路径与时间同一行：文件名那行要留给"是哪个文件 + 能拿它做什么"。
+                            \u202A…\u202C 是 LTR 嵌入 —— 容器是 rtl（为了截断截**头**、
+                            保住文件名那一端），不裹的话开头那个 "/" 会被 bidi
+                            甩到行尾，显示成 `root/工作区/a.md/`。 */}
+                        <span className="cr-file-path">
+                          {"\u202A" + f.path + "\u202C"}
+                          {/* 时间同样要裹 LTR：容器是 rtl，不裹的话
+                              "2026-09-10 00:10" 会被 bidi 反成 "00:10 2026-09-10" */}
+                          {meta?.exists && (
+                            <b className="cr-file-time">
+                              {"\u202A" + [fmtSize(meta.size), meta.mtime > 0 ? fmtTime(meta.mtime) : ""]
+                                .filter(Boolean).join(" · ") + "\u202C"}
+                            </b>
+                          )}
+                        </span>
                       </li>
                     );
                   })}
@@ -302,6 +379,7 @@ export default function ArtifactRail({
           )}
         </div>
       )}
+      {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </aside>
   );
 }

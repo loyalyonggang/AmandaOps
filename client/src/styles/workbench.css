@@ -3946,7 +3946,10 @@ button.af-line:hover{background:var(--bg2)}
 .cc-rail-badge{position:absolute;top:-2px;right:-2px;min-width:14px;height:14px;padding:0 3px;
   border-radius:7px;background:var(--acc);color:var(--bg);font-size:var(--fs-9);font-style:normal;
   line-height:14px;text-align:center}
-.cc-rail-panel{width:250px;border-left:1px solid var(--b);padding:10px 12px;overflow-y:auto;
+/* 250px 是"报告/待办"那几格够用的宽度；「文件」那格要同时放下
+   动作标签 + 文件名 + 状态 + 两颗按钮，实测 250 会把文件名挤成「广…」，
+   而名字恰恰是扫读时唯一要看的东西。窄屏另有一套规则在下面覆盖。 */
+.cc-rail-panel{width:288px;border-left:1px solid var(--b);padding:10px 12px;overflow-y:auto;
   font-size:var(--fs-11);color:var(--t2)}
 .cc-rail-title{display:flex;align-items:center;font-size:var(--fs-10);color:var(--t3);letter-spacing:.1em;
   text-transform:uppercase;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--b)}
@@ -4558,11 +4561,54 @@ html:is([data-skin="quiet"],[data-skin="lucent"],[data-skin="flat"]) .sb-workspa
 .cr-file-act.act-create{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
 .cr-file-act.act-overwrite{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber)}
 .cr-file-act.act-edit{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
-.cr-file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t)}
+.cr-file-name{color:var(--t);display:flex;align-items:baseline;gap:6px;min-width:0;overflow:hidden}
+.cr-file-label{font-weight:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  min-width:0;flex:0 1 auto}
+.cr-file-name>em{flex:0 0 auto;white-space:nowrap}
 .cr-files li em{font-size:var(--fs-9);color:var(--t3);font-style:normal}
 /* 完整路径单独一行、弱化：文件名才是扫读时要看的 */
 .cr-file-path{grid-column:1/-1;font-size:var(--fs-9);color:var(--t3);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+/* 修改时间贴在路径那一行的右端：文件名那行留给"哪个文件 + 能拿它做什么" */
+.cr-file-path>.cr-file-time{float:left;font-weight:400;color:var(--t3);margin-right:8px}
+/* ── 产物：预览 / 下载 ──────────────────────────────────────────────────────
+ * 两颗按钮固定在行尾（grid 的第三列），不参与文件名的伸缩 —— 名字长短不该
+ * 让按钮左右跳。文件不在了就整行弱化，按钮点不动。 */
+.cr-file-acts{display:flex;gap:2px;align-items:center}
+.cr-file-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border:1px solid transparent;border-radius:5px;
+  background:transparent;color:var(--t3);cursor:pointer;text-decoration:none}
+.cr-file-btn:hover:not(:disabled):not(.disabled){background:var(--bg3);color:var(--t);border-color:var(--b)}
+.cr-file-btn:disabled,.cr-file-btn.disabled{opacity:.35;cursor:not-allowed}
+.cr-file-size{color:var(--t3)}
+.cr-file-gone{color:var(--amber)}
+
+
+/* 预览弹层：正文区自己滚，头部与元信息钉住 —— 一份 500 行的 md 不该把
+ * 文件名和下载按钮顶出视口 */
+.cfp-card{width:min(920px,94vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.cfp-card .m-head{flex:0 0 auto;gap:10px}
+.cfp-card .m-head .cs-btn{text-decoration:none}
+.cfp-meta{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:6px 16px;border-bottom:1px solid var(--b);font-size:var(--fs-9);color:var(--t3)}
+.cfp-meta code{font-family:'JetBrains Mono','Fira Code','SF Mono',Consolas,monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+.cfp-meta em{font-style:normal;color:var(--amber)}
+.cfp-body{flex:1 1 auto;min-height:0;overflow:auto;padding:14px 16px}
+.cfp-note{padding:24px 8px;text-align:center;color:var(--t3);font-size:var(--fs-11);line-height:1.9}
+.cfp-err{color:var(--red)}
+.cfp-pre{margin:0;white-space:pre-wrap;word-break:break-word;
+  font-family:'JetBrains Mono','Fira Code','SF Mono',Consolas,monospace;
+  font-size:var(--fs-105);line-height:1.6;color:var(--t2)}
+.cfp-img{max-width:100%;height:auto;display:block;margin:0 auto;border-radius:6px}
+/* 图片/PDF/HTML 要一块够大的地方才看得出内容，60vh 是"翻一页不用滚两下"的下限 */
+.cfp-frame{width:100%;height:60vh;border:1px solid var(--b);border-radius:6px;background:#fff}
+.cfp-table-wrap{overflow:auto;max-width:100%}
+.cfp-table{border-collapse:collapse;font-size:var(--fs-105)}
+.cfp-table th,.cfp-table td{border:1px solid var(--b);padding:4px 8px;white-space:nowrap;
+  color:var(--t2);text-align:left}
+.cfp-table th{background:var(--bg2);color:var(--t);position:sticky;top:0}
+
 .cr-diffs{display:flex;flex-direction:column;gap:10px}
 .cr-diff{border:1px solid var(--b);border-radius:6px;overflow:hidden}
 .cr-diff-head{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg2);

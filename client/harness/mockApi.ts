@@ -478,6 +478,40 @@ const ROUTES: Array<[string, Canned | ((url: string) => Canned)]> = [
     chars: 8421, truncated: false, warnings: [],
     url: "/api/assistant/session-file/1a05105adda00002a949.pdf",
   }],
+  /*
+   * 任务台产物：文件列表 / 预览文本。字段照抄 routers/ivyea_agent 的 _file_view。
+   * 五条覆盖五种归宿：markdown（渲染）/ csv（表格）/ 图片 / 二进制（只能下载）/
+   * 已被删掉的（按钮该禁用）。少了最后两条，"点不动的时候长什么样"就没验过。
+   */
+  ["/ivyea-agent/console/sessions/s3/files", {
+    ok: true,
+    files: [
+      { id: "f1", name: "广告复盘.md", path: "/root/工作区/广告复盘.md", action: "create",
+        changes: 2, last_seen: Date.now() / 1000 - 60, kind: "markdown",
+        exists: true, size: 4213, mtime: Date.now() / 1000 - 60, previewable: true },
+      { id: "f2", name: "关键词.csv", path: "/root/工作区/关键词.csv", action: "create",
+        changes: 1, last_seen: Date.now() / 1000 - 120, kind: "csv",
+        exists: true, size: 18_442, mtime: Date.now() / 1000 - 120, previewable: true },
+      { id: "f3", name: "趋势图.png", path: "/root/工作区/趋势图.png", action: "create",
+        changes: 1, last_seen: Date.now() / 1000 - 180, kind: "image",
+        exists: true, size: 220_133, mtime: Date.now() / 1000 - 180, previewable: true },
+      { id: "f4", name: "明细.xlsx", path: "/root/工作区/明细.xlsx", action: "create",
+        changes: 1, last_seen: Date.now() / 1000 - 240, kind: "binary",
+        exists: true, size: 1_402_331, mtime: Date.now() / 1000 - 240, previewable: false },
+      { id: "f5", name: "草稿.md", path: "/root/工作区/草稿.md", action: "overwrite",
+        changes: 3, last_seen: Date.now() / 1000 - 300, kind: "markdown",
+        exists: false, size: 0, mtime: 0, previewable: false },
+    ],
+  }],
+  ["/ivyea-agent/console/files/", (url: string) => {
+    const id = (url.split("/ivyea-agent/console/files/")[1] || "").split("/")[0];
+    const text = id === "f2"
+      ? "关键词,搜索量,转化率\ncamping chair,12800,4.1%\nfolding chair,9400,3.2%"
+      : "# 广告复盘\n\n本周只动出价，不动结构。\n\n- ACOS 从 31% 降到 24%\n- 否掉 15 次点击 0 单的词\n";
+    return { ok: true, name: id === "f2" ? "关键词.csv" : "广告复盘.md",
+             path: "/root/工作区/x", kind: id === "f2" ? "csv" : "markdown",
+             text, truncated: false, size: text.length };
+  }],
   ["/ivyea-agent/console/sessions", {
     // 服务端是按 updated 倒序端出来的，这里也排一遍 —— 让终端会话夹在网页会话
     // 中间，而不是整齐地垫在最后。"夹在中间"才验得到来源小标在混排下的对齐。
