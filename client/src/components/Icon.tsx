@@ -5,7 +5,7 @@ import {
   MessageCircleQuestion, Newspaper, Palette, PanelLeftClose, PanelLeftOpen, Plus,
   Settings, Ship, Sparkles, Target, Terminal, TrendingDown, Type, Users,
   Timer, History, Flag, Search, X, Pin,
-  ArrowUp, Cpu, Eye, Paperclip, Square, ShieldCheck, Zap,
+  ArrowUp, Cpu, Download, Eye, Paperclip, Square, ShieldCheck, Zap,
   Ban, Brain, Check, ChevronDown, ChevronUp, FilePen, GitBranch, Link2, Plug,
   RefreshCw, Copy, Wrench,
   type LucideIcon,
@@ -123,6 +123,9 @@ const ICONS: Record<string, LucideIcon> = {
   "chev-down": ChevronDown,
   // ── 回答末尾的动作行 ──
   copy: Copy,
+  // 任务台产物栏：把跑出来的文件下走 / 先看一眼
+  download: Download,
+  preview: Eye,
   regenerate: RefreshCw,
 };
 

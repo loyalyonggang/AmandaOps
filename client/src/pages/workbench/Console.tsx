@@ -48,6 +48,7 @@ import {
   consolePresets,
   consoleWorkspaceCreate,
   consoleSessionApprovals,
+  consoleSessionFiles,
   consoleSessionImport,
   consoleSessions,
   answerResetDiscards,
@@ -70,6 +71,7 @@ import {
   ivyeaSkills,
   visionDescribe,
   type IvyeaChatAttachment,
+  type ConsoleFile,
   type ConsolePreset,
   type IvyeaContextUsage,
   type IvyeaFileChange,
@@ -351,10 +353,33 @@ function ConsoleInner({ embedded = false, sessionId: embedSession = "",
   // 本会话 Agent 改过的文件。同一路径被改多次时**保留每一次** —— 折叠成一条会让
   // "先写后改"的过程消失，而那恰恰是用户想复盘的东西。
   const [fileChanges, setFileChanges] = useState<IvyeaFileChange[]>([]);
+  /**
+   * 服务端记下的产物索引。**这一条才让"下载"在刷新之后还成立** ——
+   * 上面那个 fileChanges 是实时事件，页面一卸载就没了（历史会话恢复时也会被清空）。
+   */
+  const [sessionFiles, setSessionFiles] = useState<ConsoleFile[]>([]);
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [followLoading, setFollowLoading] = useState(false);
   const [followEnabled, setFollowEnabled] = useState(prefs.current.followUps !== false);
   const [attaching, setAttaching] = useState(false);
+
+  /**
+   * 一有文件写出来就把服务端索引取回来（拿的是 id / 大小 / 还在不在 —— 下载按钮要用）。
+   *
+   * 为什么不能只等恢复会话时取一次：最常见的用法恰恰是**跑完当场就想下载**，
+   * 那时候页面还没刷新过，索引却已经在服务端了。防抖 700ms 是因为一轮里
+   * 写十个文件会发十条事件，没必要请求十次。
+   */
+  useEffect(() => {
+    if (!sessionId || fileChanges.length === 0) return;
+    const t = window.setTimeout(() => {
+      void consoleSessionFiles(sessionId)
+        .then(setSessionFiles)
+        .catch(() => void 0);
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [sessionId, fileChanges.length]);
+
   // 历史会话按轮分页：`from` 是本页最早的轮号，取更早一页时当游标传回去。
   const [earlier, setEarlier] = useState<{ hasMore: boolean; from: number; loading: boolean }>(
     { hasMore: false, from: 0, loading: false });
@@ -557,6 +582,7 @@ function ConsoleInner({ embedded = false, sessionId: embedSession = "",
     setTodos([]);
     setRailApprovals([]);
     setFileChanges([]);
+    setSessionFiles([]);
     setFollowUps([]);
     setUsage(null);
     setCtxUsage(null);
@@ -638,6 +664,11 @@ function ConsoleInner({ embedded = false, sessionId: embedSession = "",
         setFollowUps([]);
         setTodos([]);
         setFileChanges([]);
+        // 产物索引同理落在服务端：跑出来的文件要在第二天还能点开、下下来。
+        setSessionFiles([]);
+        void consoleSessionFiles(urlSession)
+          .then((list) => { if (alive) setSessionFiles(list); })
+          .catch(() => void 0);   // 拿不到产物索引不影响会话本身
         // 审批留痕落在服务端，刷新/隔天回来都还在 —— 这是这套系统最该
         // 留下的一条记录，不能只活在内存里。
         setRailApprovals([]);
@@ -1773,6 +1804,7 @@ function ConsoleInner({ embedded = false, sessionId: embedSession = "",
         answers={turns.filter((t) => t.role === "assistant" && !t.failed).map((t) => t.text)}
         todos={todos}
         fileChanges={fileChanges}
+        files={sessionFiles}
         approvals={railApprovals}
         sessionId={sessionId}
         model={model}
