@@ -88,7 +88,9 @@ def test_list_reports_live_stat(tmp_path):
     files = mod.console_session_files("s1", info=ALICE)["files"]
     by_name = {x["name"]: x for x in files}
     assert by_name["报表.md"]["exists"] is True
-    assert by_name["报表.md"]["size"] == len("# 标题\n正文".encode("utf-8"))
+    # 跟**盘上的真实大小**比，别自己算字节数：Windows 上 write_text 会把 \n
+    # 换成 \r\n，算出来的 15 和盘上的 16 对不上（CI 的 windows 任务抓到过）。
+    assert by_name["报表.md"]["size"] == f.stat().st_size
     assert by_name["报表.md"]["kind"] == "markdown"
     assert by_name["报表.md"]["previewable"] is True
     # 文件被删了要如实说，不能拿库里的旧值画一个点了报错的按钮
