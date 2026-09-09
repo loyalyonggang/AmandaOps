@@ -32,6 +32,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Icon from "../Icon";
 import { MarkdownReport } from "../../lib/reportFormat";
+import { errText } from "../../lib/errText";
 import { consoleFileRawUrl, consoleFileText, type ConsoleFile } from "../../api/ivyeaAgent";
 
 /** 预览里的 HTML 一律断网：只允许内联样式与 data: 图片。 */
@@ -98,8 +99,10 @@ export default function FilePreview({ file, onClose }: { file: ConsoleFile; onCl
       .catch((e) => {
         if (!alive) return;
         // 说清是哪一步失败的：文件被删了和没权限是两回事，
-        // 都写成"加载失败"用户只能干瞪眼
-        setErr(e?.response?.data?.detail || e?.message || "读不到这个文件");
+        // 都写成"加载失败"用户只能干瞪眼。
+        // 走 errText 而不是直接读 detail —— 422 的 detail 是对象数组，
+        // 直接渲染会把整页崩成「渲染失败」（见 scripts/check-errtext.mjs）。
+        setErr(errText(e, "读不到这个文件"));
       })
       .finally(() => alive && setLoading(false));
     return () => {
