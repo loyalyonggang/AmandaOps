@@ -847,6 +847,82 @@ const ROUTES: Array<[string, Canned | ((url: string) => Canned)]> = [
   // 才逼得出结果条的换行 —— .hs-key-inline 那一档（密钥输入框和按钮挤在同一排）
   // 只剩几十像素给结果条，验的就是它到底会换行还是把这一排顶出去。
   ["/settings/test", { ok: true, detail: "连通正常：api.apimart.ai，模型 gpt-image-2 可用（耗时 1.2s）" }],
+  // 自定义 MCP 数据源。**故意给一条"配了一半"的**：勾了首页板块、能力只配了
+  // ASIN 卡片 —— 半配态才验得到"哪些板块还点不亮"的提示，全配的话那行永远不出现。
+  ["/data-sources", {
+    sources: [{
+      id: "myerp", name: "我的 ERP", enabled: true, transport: "http",
+      url: "https://mcp.example.com/mcp",
+      auth: { mode: "query", name: "key", value: "", value_set: true },
+      headers: {}, headers_set: [], handshake: true, envelope: "", timeout: 40,
+      surfaces: ["home"],
+      capabilities: {
+        home_asin_pulse: {
+          tool: "product_detail",
+          args: { asin: "{asin}", site: "{marketplace}" },
+          fields: { title: "productName", price: "priceInfo.amount", bsr: "rank.main" },
+        },
+      },
+      note: "",
+    }],
+    capabilities: ["keyword_pipeline", "asin_pipeline", "home_asin_pulse"],
+    surfaces: ["market", "playbook", "home"],
+    surface_requires: { market: ["keyword_pipeline"], playbook: ["keyword_pipeline"], home: ["home_asin_pulse"] },
+  }],
+  ["/data-sources/probe", {
+    ok: true, count: 2,
+    note: "工具清单通常不需要鉴权即可读取，能列出工具不代表密钥有效；请用「试跑」验证。",
+    tools: [
+      { name: "product_detail", description: "按 ASIN 查商品详情，返回标题/价格/BSR/评分等字段",
+        params: ["asin", "site"], required: ["asin"] },
+      { name: "keyword_detail", description: "关键词搜索量与竞价",
+        params: ["keyword", "site"], required: ["keyword"] },
+    ],
+  }],
+  // 自动配置的报告。**故意留两项没配成** —— 全绿的话"没配上会怎样"那段提示
+  // 和「高级设置」的引导永远渲染不到。
+  ["/data-sources/autoconfig", {
+    source: null,
+    report: {
+      ok: true, tools: 7, surfaces: ["home", "market", "playbook"],
+      capabilities: [
+        { id: "home_asin_pulse", label: "ASIN 监控卡片", ok: true, tool: "item_lookup",
+          matched: 12, missing: ["coupon", "deal", "inventory"] },
+        { id: "home_keyword_pulse", label: "关键词监控卡片", ok: true, tool: "term_metrics",
+          matched: 3, missing: ["competition_index"] },
+        { id: "home_keyword_trend_series", label: "关键词趋势", ok: true, tool: "term_history",
+          matched: 2, missing: [] },
+        { id: "home_keyword_extends", label: "拓展词", ok: true, tool: "term_related",
+          matched: 5, missing: [] },
+        { id: "home_category", label: "类目大盘", ok: true, tool: "category_top",
+          matched: 9, missing: [] },
+        { id: "keyword_pipeline", label: "关键词采集（市场调研 / 打法推荐）", ok: true,
+          tool: "term_metrics、term_history、term_related", matched: 3, missing: [] },
+        { id: "asin_pipeline", label: "ASIN 采集（市场调研 / 打法推荐）", ok: true,
+          tool: "item_lookup、item_sales_history", matched: 2, missing: [] },
+        { id: "home_market_metrics", label: "大盘指标", ok: false, reason: "no_data",
+          error: "category_top 调通了，但返回里认不出需要的字段",
+          candidates: [{ tool: "market_overview", description: "类目大盘概览", args: {} }] },
+        { id: "home_keyword_purchase_evidence", label: "关键词购买佐证", ok: false,
+          reason: "not_recognized",
+          error: "有 2 个吃「关键词」的工具，但从名字和描述认不出哪个是干这件事的",
+          candidates: [{ tool: "f_001", description: "接口一", args: {} },
+                       { tool: "f_002", description: "接口二", args: {} }] },
+        { id: "home_product_trend_series", label: "ASIN 销量趋势", ok: false,
+          reason: "no_tool", error: "这台服务器没有吃「ASIN」的工具", candidates: [] },
+      ],
+    },
+  }],
+  ["/data-sources/remap", {
+    ok: true, matched: 11, missing: ["coupon"],
+    spec: { tool: "f_001", args: { asin: "{asin}" },
+            fields: { title: "productName", price: "sellPrice" } },
+  }],
+  ["/data-sources/test", {
+    ok: true, errors: [], filled_fields: 7,
+    result: { asin: "B0DEMO1234", title: "Demo Widget", price: 19.99, bsr: 1234,
+              rating: 4.5, review_count: 88, data_source: "custom:myerp", error: null },
+  }],
   ["/settings/amazon", () => ({
     ok: true, configured: true, ads_configured: false, ads_uses_own_app: false,
     region: "eu", spapi_host: "https://sellingpartnerapi-eu.amazon.com",
