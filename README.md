@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Upstream Release](https://img.shields.io/github/v/release/Hector-xue/IvyeaOps?label=upstream%20release)](https://github.com/Hector-xue/IvyeaOps/releases/latest)
-[![Stars](https://img.shields.io/github/stars/loyalyonggang/IvyeaOps?style=flat&logo=github)](https://github.com/loyalyonggang/IvyeaOps/stargazers)
+[![Stars](https://img.shields.io/github/stars/loyalyonggang/AmandaOps?style=flat&logo=github)](https://github.com/loyalyonggang/AmandaOps/stargazers)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
 ![Backend](https://img.shields.io/badge/backend-FastAPI-009688?logo=fastapi&logoColor=white)
 ![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=white)
@@ -31,13 +31,13 @@ Listing 套图制作、图片翻译、市场调研、深度分析、广告优化
 - **支持平台**：Linux / macOS（完整，含 `.app` 免环境包）· Windows（除 PTY 终端外完整；Windows x64 有免 Python 包）。
   - macOS 首次双击 `IvyeaOps.app` 若被 Gatekeeper 拦截（未签名），右键 →「打开」一次即可；浏览器会自动开到 http://127.0.0.1:8001 。
 - **默认端口**：`8001`（`http://127.0.0.1:8001`）。
-- **仓库**：<https://github.com/loyalyonggang/IvyeaOps>
+- **仓库**：<https://github.com/loyalyonggang/AmandaOps>
 
 ---
 
 ## 交流与反馈
 
-欢迎扫码加入上游项目微信群，反馈 Bug、交流 IvyeaOps 使用经验、AI 工具与亚马逊运营相关知识。Amanda 品牌版本的问题与建议请到本仓库提交 [Issue](https://github.com/loyalyonggang/IvyeaOps/issues) / PR。群二维码可能会过期；如果扫码失效，可先关注公众号，再获取最新群二维码。
+欢迎扫码加入上游项目微信群，反馈 Bug、交流 IvyeaOps 使用经验、AI 工具与亚马逊运营相关知识。Amanda 品牌版本的问题与建议请到本仓库提交 [Issue](https://github.com/loyalyonggang/AmandaOps/issues) / PR。群二维码可能会过期；如果扫码失效，可先关注公众号，再获取最新群二维码。
 
 <table>
   <tr>
