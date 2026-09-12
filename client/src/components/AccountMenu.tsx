@@ -181,7 +181,7 @@ export default function AccountMenu(props: AccountMenuProps) {
         {/* 头像位放 Ivyea logo 而不是姓名首字母：这个位置**点不出上传头像**，
             那就不该摆一个看起来可以换、其实换不了的占位符。 */}
         <span className="sb-acct-avatar">
-          <img src="/ivyea-logo.png" alt="Ivyea" />
+          <img src="/amanda-logo.svg" alt="Amanda 跨境工作台" />
           {hasUpdate && <span className="sb-acct-dot" aria-label="发现新版本" />}
         </span>
         <span className="sb-acct-text">

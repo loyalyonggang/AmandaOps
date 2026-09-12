@@ -1529,7 +1529,7 @@ function ConsoleInner({ embedded = false, sessionId: embedSession = "",
             {/* 嵌入模式（悬浮球）里 Hero 只留一行小字：面板本来就只有几百像素高，
                 44px 的 logo + 24px 大标题会把输入框顶到看不见的地方。 */}
             <div className="cc-hero-brand">
-              {!embedded && <img src="/ivyea-logo.png" alt="Ivyea" className="cc-hero-logo" />}
+              {!embedded && <img src="/amanda-logo.svg" alt="Amanda 跨境工作台" className="cc-hero-logo" />}
               <h1 className="cc-hero-title">{embedded ? "有什么可以帮你？" : "意念所至，行动随行"}</h1>
             </div>
             <div className="cc-hero-composer">{composerNode(false)}</div>

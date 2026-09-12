@@ -41,8 +41,9 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <form className="login-box" onSubmit={onSubmit}>
-        <div className="mark">OPS WORKBENCH</div>
-        <h1>{isReg ? <>注册账号 · <b>IvyeaOps</b></> : <>欢迎回来 · <b>IvyeaOps</b></>}</h1>
+        <img className="login-logo" src="/amanda-logo.svg" alt="Amanda 跨境工作台" />
+        <div className="mark">CROSS-BORDER WORKBENCH</div>
+        <h1>{isReg ? <>注册账号 · <b>Amanda</b></> : <>欢迎回来 · <b>Amanda 跨境工作台</b></>}</h1>
 
         <label>{isReg ? "邮箱" : "账号 / 邮箱"}</label>
         <input

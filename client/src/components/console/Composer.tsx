@@ -100,7 +100,7 @@ export default function Composer({
   modelSwitchable = false,
   onModelSettings,
   onModelDefault,
-  placeholder = "告诉 Ivyea 你想做什么，剩下的交给我……",
+  placeholder = "告诉 Amanda 你想做什么，剩下的交给我……",
   autoFocus,
   compact,
   attaching,

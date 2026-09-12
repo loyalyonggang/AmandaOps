@@ -46,7 +46,7 @@ def client_error(body: ClientErrorBody) -> dict:
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "IvyeaOps", "version": app_version()}
+    return {"status": "ok", "service": "Amanda 跨境工作台", "version": app_version()}
 
 
 class BackupBody(BaseModel):

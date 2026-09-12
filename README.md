@@ -1,20 +1,26 @@
-# IvyeaOps · 自托管亚马逊运营工作台
+# Amanda 跨境工作台
+
+<p align="center">
+  <img src="client/public/amanda-logo.svg" alt="Amanda 跨境工作台 Logo" width="112" />
+</p>
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/Hector-xue/IvyeaOps?label=release)](https://github.com/Hector-xue/IvyeaOps/releases/latest)
-[![Stars](https://img.shields.io/github/stars/Hector-xue/IvyeaOps?style=flat&logo=github)](https://github.com/Hector-xue/IvyeaOps/stargazers)
+[![Upstream Release](https://img.shields.io/github/v/release/Hector-xue/IvyeaOps?label=upstream%20release)](https://github.com/Hector-xue/IvyeaOps/releases/latest)
+[![Stars](https://img.shields.io/github/stars/loyalyonggang/IvyeaOps?style=flat&logo=github)](https://github.com/loyalyonggang/IvyeaOps/stargazers)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
 ![Backend](https://img.shields.io/badge/backend-FastAPI-009688?logo=fastapi&logoColor=white)
 ![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=white)
 
-**IvyeaOps** 是一套**开源、自托管**的亚马逊运营工作台：一台服务器、一次登录，把
+**Amanda 跨境工作台**是一套**开源、自托管**的亚马逊运营工作台：一台服务器、一次登录，把
 Listing 套图制作、图片翻译、市场调研、深度分析、广告优化（含领星 ERP 接入）、内置 IvyeaAgent、
 知识库、Skill 工坊、服务器运维等运营全流程，统一收进浏览器里。
 
 > 数据与密钥都留在你自己的服务器，不绑定任何第三方云。**AGPL-3.0** 开源，可自由使用、修改、自托管。
+>
+> 本项目基于 [IvyeaOps](https://github.com/Hector-xue/IvyeaOps) 二次开发，保留原项目许可证与上游归属。
 
 <p align="center">
-  <img src="docs/assets/screenshot-listing-main-images.png" alt="IvyeaOps · Listing 工作台 套图分镜" width="100%" />
+  <img src="docs/assets/screenshot-listing-main-images.png" alt="Amanda 跨境工作台 · Listing 工作台套图分镜" width="100%" />
   <br />
   <sub>Listing 工作台 · 套图分镜：一张白底图锁住产品真值，整套主图 / A+ 的画面与英文文案由模型一次直出；每张过质检、人工复核后才可交付（方法论见 <a href="docs/listing-visual-studio.md">套图工作台文档</a>，更多界面见 <a href="#界面预览">界面预览</a>）</sub>
 </p>
@@ -25,13 +31,13 @@ Listing 套图制作、图片翻译、市场调研、深度分析、广告优化
 - **支持平台**：Linux / macOS（完整，含 `.app` 免环境包）· Windows（除 PTY 终端外完整；Windows x64 有免 Python 包）。
   - macOS 首次双击 `IvyeaOps.app` 若被 Gatekeeper 拦截（未签名），右键 →「打开」一次即可；浏览器会自动开到 http://127.0.0.1:8001 。
 - **默认端口**：`8001`（`http://127.0.0.1:8001`）。
-- **仓库**：<https://github.com/Hector-xue/IvyeaOps>
+- **仓库**：<https://github.com/loyalyonggang/IvyeaOps>
 
 ---
 
 ## 交流与反馈
 
-欢迎扫码加入微信群，反馈 Bug、交流 IvyeaOps 使用经验、AI 工具与亚马逊运营相关知识。**也欢迎提改进建议**——功能需求、交互优化、文档纠错都行，可在群里直接说，或到 GitHub 提 [Issue](https://github.com/Hector-xue/IvyeaOps/issues) / PR。群二维码可能会过期；如果扫码失效，可先关注公众号，再获取最新群二维码。
+欢迎扫码加入上游项目微信群，反馈 Bug、交流 IvyeaOps 使用经验、AI 工具与亚马逊运营相关知识。Amanda 品牌版本的问题与建议请到本仓库提交 [Issue](https://github.com/loyalyonggang/IvyeaOps/issues) / PR。群二维码可能会过期；如果扫码失效，可先关注公众号，再获取最新群二维码。
 
 <table>
   <tr>
