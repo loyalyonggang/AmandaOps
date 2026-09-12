@@ -1,6 +1,6 @@
 # zach-search-term-report-analyzer
 
-> **作者**：Zach ｜ 公众号「Zach的进化笔记」
+> **作者**：Zach
 >
 > Learn in public！把 Amazon Ads 搜索词报告变成可复核的否词、控成本、放量和 Listing 反馈清单。
 
@@ -110,13 +110,3 @@ outputs/search-term-report-analyzer/ExampleBrand/
 4. 修复后告诉我还需要重启 IDE、重新加载工作区，还是重新运行哪个命令
 5. 最后给我一个最短的验证步骤，确认这个 skill 已经能用了
 ```
-
-## 关于作者
-
-关注「**Zach的进化笔记**」，获取 AI x 跨境电商的实战经验、工具和方法论：
-
-<img src="../../assets/traffic/wechat-official-account.jpg" width="200" alt="公众号二维码" />
-
-扫码加入交流群，一起交流 AI + 跨境电商的实战玩法：
-
-<img src="../../assets/traffic/wechat-group.jpeg" width="200" alt="wechat-group" />

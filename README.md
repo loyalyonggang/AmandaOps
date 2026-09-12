@@ -35,31 +35,6 @@ Listing 套图制作、图片翻译、市场调研、深度分析、广告优化
 
 ---
 
-## 交流与反馈
-
-欢迎扫码加入上游项目微信群，反馈 Bug、交流 IvyeaOps 使用经验、AI 工具与亚马逊运营相关知识。Amanda 品牌版本的问题与建议请到本仓库提交 [Issue](https://github.com/loyalyonggang/AmandaOps/issues) / PR。群二维码可能会过期；如果扫码失效，可先关注公众号，再获取最新群二维码。
-
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="docs/assets/wechat-group-qr.png" alt="Ivyea 微信交流群二维码" width="300" />
-      <br />
-      <strong>微信群：Ivyea 的精神股东们</strong>
-      <br />
-      <sub>反馈 Bug / 交流 AI 与运营 / 提改进建议</sub>
-    </td>
-    <td align="center" width="50%">
-      <img src="docs/assets/wechat-official-account-qr.jpg" alt="Ivyea 公众号二维码" width="220" />
-      <br />
-      <strong>公众号</strong>
-      <br />
-      <sub>群二维码失效时，关注后获取最新版</sub>
-    </td>
-  </tr>
-</table>
-
----
-
 ## 目录
 
 - [核心特性](#核心特性)
@@ -75,7 +50,6 @@ Listing 套图制作、图片翻译、市场调研、深度分析、广告优化
 - [安全须知](#安全须知)
 - [致谢](#致谢)
 - [许可证](#许可证)
-- [请作者喝杯咖啡](#-请作者喝杯咖啡)
 
 ---
 
@@ -474,21 +448,3 @@ IvyeaOps 站在不少优秀开源项目之上，特此致谢：
 **AGPL-3.0**（GNU Affero General Public License v3.0）。完整条款见 [`LICENSE`](LICENSE)。
 
 本项目的「外部智能体」板块移植自 AGPL-3.0 的 [claudecodeui](https://github.com/siteboon/claudecodeui)，按其 copyleft 要求，整个 IvyeaOps 以 AGPL-3.0 发布：你可自由使用、修改、自托管；若你**修改后作为网络服务提供给他人使用**，须向这些用户提供完整的对应源码（AGPL 第 13 条「网络条款」）。
-
----
-
-## ☕ 请作者喝杯咖啡
-
-IvyeaOps 一直是免费开源、可完全自托管的。如果这套工作台让你感觉还行、少踩了坑，欢迎请作者喝杯咖啡——一杯咖啡就是下个版本的动力。当然，点个 Star，同样是很大的支持。
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="docs/assets/wechat-pay-qr.png" alt="微信收款码" width="300" />
-      <br />
-      <strong>微信扫码 · 支持作者</strong>
-      <br />
-      <sub>金额随意，心意都收到了</sub>
-    </td>
-  </tr>
-</table>
