@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "amanda-ops-gateway",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-12",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "kj.xzggai.com",
+      "custom_domain": true
+    }
+  ],
+  "vpc_networks": [
+    {
+      "binding": "AMANDA_ORIGIN",
+      "tunnel_id": "ce75dcd8-bcff-4b36-bf9d-75ef0a1b46bb",
+      "remote": true
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

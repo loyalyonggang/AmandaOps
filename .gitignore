@@ -27,6 +27,7 @@ dist/
 # Deploy (private — contains your domain & paths; render targets are generated)
 deploy/install.conf
 deploy/dist/
+.wrangler/
 
 # Editor
 .vscode/
